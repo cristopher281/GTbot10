@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GTbot Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron&display=swap" rel="stylesheet">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      background: #0f0f0f;
+      color: #00ffe5;
+      font-family: 'Orbitron', sans-serif;
+      padding: 2rem;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2.5rem;
+    }
+    #agenda-container {
+      background: #1a1a1a;
+      border: 1px solid #00ffe5;
+      padding: 1rem;
+      border-radius: 10px;
+      max-width: 800px;
+      margin: auto;
+    }
+    .tarea {
+      border-bottom: 1px solid #00ffe5;
+      padding: 1rem 0;
+    }
+    .tarea:last-child {
+      border-bottom: none;
+    }
+    .tarea h3 {
+      font-size: 1.3rem;
+    }
+    .tarea p {
+      font-size: 1rem;
+      color: #aaa;
+    }
+    .acciones {
+      margin-top: 0.5rem;
+    }
+    .acciones button {
+      background: #00ffe5;
+      color: #000;
+      border: none;
+      padding: 0.3rem 0.7rem;
+      margin-right: 0.5rem;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: 'Orbitron', sans-serif;
+    }
+    #guardar {
+      display: block;
+      margin: 2rem auto;
+      padding: 0.5rem 1rem;
+      background: #00ffe5;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <h1>GTbot Agenda</h1>
+  <div id="agenda-container">
+    <p>Cargando tareas...</p>
+  </div>
+  <button id="guardar">Guardar Cambios</button>
+
+  <script>
+    let agenda = {};
+    const container = document.getElementById('agenda-container');
+    const guardarBtn = document.getElementById('guardar');
+
+    function cargarAgenda() {
+      fetch('/agenda')
+        .then(res => res.json())
+        .then(data => {
+          agenda = data;
+          renderAgenda();
+        })
+        .catch(err => {
+          container.innerHTML = '<p>Error al cargar la agenda.</p>';
+          console.error(err);
+        });
+    }
+
+    function renderAgenda() {
+      container.innerHTML = '';
+      let hayTareas = false;
+
+      for (const contacto in agenda) {
+        agenda[contacto].forEach((tarea, index) => {
+          hayTareas = true;
+          const div = document.createElement('div');
+          div.classList.add('tarea');
+          div.innerHTML = `
+            <h3 contenteditable="true" data-contacto="${contacto}" data-index="${index}" data-tipo="tarea">${tarea.tarea}</h3>
+            <p>Fecha: <span contenteditable="true" data-contacto="${contacto}" data-index="${index}" data-tipo="fecha">${new Date(tarea.fechaHora).toLocaleString()}</span></p>
+            <p>Contacto: ${contacto}</p>
+            <div class="acciones">
+              <button onclick="eliminarTarea('${contacto}', ${index})">Eliminar</button>
+            </div>
+          `;
+          container.appendChild(div);
+        });
+      }
+
+      if (!hayTareas) {
+        container.innerHTML = '<p>No hay tareas registradas.</p>';
+      }
+    }
+
+    function eliminarTarea(contacto, index) {
+      agenda[contacto].splice(index, 1);
+      if (agenda[contacto].length === 0) delete agenda[contacto];
+      renderAgenda();
+    }
+
+    guardarBtn.addEventListener('click', () => {
+      const editables = document.querySelectorAll('[contenteditable="true"]');
+      editables.forEach(el => {
+        const contacto = el.getAttribute('data-contacto');
+        const index = el.getAttribute('data-index');
+        const tipo = el.getAttribute('data-tipo');
+        if (tipo === 'tarea') {
+          agenda[contacto][index].tarea = el.innerText;
+        } else if (tipo === 'fecha') {
+          const fecha = new Date(el.innerText);
+          if (!isNaN(fecha)) {
+            agenda[contacto][index].fechaHora = fecha.toISOString();
+          }
+        }
+      });
+
+      fetch('/agenda', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(agenda)
+      })
+        .then(res => res.text())
+        .then(msg => alert(msg))
+        .catch(err => alert('Error al guardar'));
+    });
+
+    cargarAgenda();
+  </script>
+</body>
+</html>
